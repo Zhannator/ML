@@ -3,16 +3,16 @@ import cv2
 #import matplotlib.pyplot as plt
 import numpy as np
 from cvxopt import matrix, solvers
+import math
 
-def training(img_training, img_training_t, num_of_people):
+def training(img_training, num_of_people, polynomial_flag = False, polynomial_degree = 2.0):
+	# Row image -> column images
+	img_training_t = np.transpose(img_training)	
 	rows, columns = img_training_t.shape
 
-	c = 2.0 # Linear
+	# Constants
+	c = 2.0
 
-	alpha_min = 1e-10
-
-	const_P = 1e-13
-	
 	# These variables will collect w's and b's for each class
 	svm_w = []
 	svm_b = []	
@@ -38,8 +38,14 @@ def training(img_training, img_training_t, num_of_people):
 		K = matrix(np.zeros((columns, columns)))
 		for i in range(columns):
 			for j in range(columns):
-				# For linear SVM, single K value is calculated using dot product of two column vectors from training data
-				K[i, j] = np.dot(img_training_t[:, i], img_training_t[:, j])
+				# Choose between linear and polynomial svm
+				if polynomial_flag == True:
+					K[i, j] = math.pow((np.dot(img_training_t[:, i], img_training_t[:, j]) + 1.0), polynomial_degree)
+				else: # Linear and aslo default
+					# For linear SVM, single K value is calculated using dot product of two column vectors from training data			
+					K[i, j] = np.dot(img_training_t[:, i], img_training_t[:, j])
+				
+				
 
 		# Calculate variables needed for quadratic programming solver
 	        P = matrix(np.outer(labels, labels) * K)
@@ -71,11 +77,13 @@ def training(img_training, img_training_t, num_of_people):
 		# Calculate alfas using quadratic programming solver
 
         	solution = solvers.qp(P, q, G, h, A, b)
-		alphas = np.array(solution['x'], np.double)
+		alphas = np.array(solution['x'], np.double)		
+		alpha_min = min(alphas)
 		#print alphas
 
 		# Calculate w		
 		w = np.sum(alphas * labels[:, None] * img_training, axis = 0)
+		#print "\nTHIS IS W:\n"	
 		#print w
 		#print len(w)
 		svm_w.append(w)	
@@ -122,20 +130,43 @@ def testing(img_testing, num_of_people, w, b):
 			current_class = int(r / 2) + 1
 			if ((test > 0) & (i + 1 == current_class)): # True Positive - Classified Correctly
 				total_correct = total_correct + 1.0
-				print "\nImage {} classified true positive for class {}.\n".format(r + 1, current_class)
+				#print "\nImage {} classified true positive for class {}.\n".format(r + 1, current_class)
 			elif ((test <= 0) & (i + 1 != current_class)): # True Negative - Classified Correctly
 				total_correct = total_correct + 1.0
-				print "\nImage {} classified true negative for class {}.\n".format(r + 1, current_class)
+				#print "\nImage {} classified true negative for class {}.\n".format(r + 1, current_class)
 			elif ((test > 0) & (i + 1 != current_class)): # False Positive - Classified Incorrectly
 				total_incorrect = total_incorrect + 1.0
-				print "\n--Image {} classified false positive for class {}.--\n".format(r + 1, current_class)		
+				#print "\n--Image {} classified false positive for class {}.--\n".format(r + 1, current_class)		
 			else: # False Negative - Classified Incorrectly
 				total_incorrect = total_incorrect + 1.0
-				print "\n--Image {} classified false negative as class {}.--\n".format(r + 1, current_class)		
+				#print "\n--Image {} classified false negative as class {}.--\n".format(r + 1, current_class)		
 		
 	print "\nTotal correct classifications: {}.\n".format(total_correct)
 	print "\nTotal incorrect classifications: {}.\n".format(total_incorrect)
-	return ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+	accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+	print "\nOverall accuracy is {}%.\n".format(accuracy)
+	return accuracy
+
+def svm(num_of_people, img_training, img_testing):
+	# ----------------------------------------------
+	# TRAINING
+	# ----------------------------------------------
+	
+	print "\nTraining..."
+
+	w, b = training(img_training, num_of_people) # w and b are in order of class (1 through 40)
+	
+	#print w
+	#print w.shape
+	#print b
+
+	# ----------------------------------------------
+	# TESTING
+	# ----------------------------------------------
+		
+	print "\nTesting..."
+
+	accuracy = testing(img_testing, num_of_people, w, b)
 
 def main():
 
@@ -170,32 +201,11 @@ def main():
 	# Convert images to type double
 	img_training = (np.array(img_training)).astype(np.double)
 	img_testing = (np.array(img_testing)).astype(np.double)
-
-	# Row image -> column images
-	img_training_t = np.transpose(img_training)	
-	#img_testing_t = np.transpose(img_testing)
-
-	# ----------------------------------------------
-	# TRAINING
-	# ----------------------------------------------
 	
-	print "\nTraining..."
-
-	w, b = training(img_training, img_training_t, num_of_people) # w and b are in order of class (1 through 40)
-	
-	#print w
-	#print w.shape
-	#print b
-
 	# ----------------------------------------------
-	# TESTING
+	# BEGIN FIVE-FOLD CROSS VALIDATION PROCEDURE
 	# ----------------------------------------------
-		
-	print "\nTesting..."
-
-	accuracy = testing(img_testing, num_of_people, w, b)
-
-	print "\nOverall accuracy is {}%.\n".format(accuracy)
+	svm(num_of_people, img_training, img_testing)
 
 if __name__ == "__main__":
 	main()
