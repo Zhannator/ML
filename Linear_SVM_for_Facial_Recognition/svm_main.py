@@ -15,8 +15,8 @@ def training(img_training, classes_training, num_of_people, polynomial_flag = Fa
 	c = 2.0
 
 	# These variables will collect w's and b's for each class
-	svm_w = []
-	svm_b = []	
+	svm_w = np.zeros((num_of_people, rows))
+	svm_b = np.zeros(num_of_people)	
 	
 	# Column to row images
 	img_training_t = np.array(img_training_t, np.double)
@@ -24,12 +24,14 @@ def training(img_training, classes_training, num_of_people, polynomial_flag = Fa
 	# Iterate through 40 classes
 	for class_i in range(1, num_of_people + 1, 1):
 		# Create label list where images in this class will be labeled as 1 and images not in this class will be labeled as -1
-		labels = []
+		labels = np.zeros(columns)
+		labels_index = 0
 		for my_c in classes_training:
 			if my_c == class_i:
-				labels.append(1)
+				labels[labels_index] = 1
 			else:
-				labels.append(-1)
+				labels[labels_index] = -1
+			labels_index = labels_index + 1
 
 		# Labels has to be of type double for quadratic programming solver
 		labels = np.array(labels, np.double)		
@@ -65,16 +67,18 @@ def training(img_training, classes_training, num_of_people, polynomial_flag = Fa
 
 		# Calculate w		
 		w = np.sum(alphas * labels[:, None] * img_training, axis = 0)
-		svm_w.append(w)	
+		svm_w[class_i - 1] = w	
 		# Calculate b
 		non_zero_alpha_indexes = (np.where(alphas > alpha_min))[0]
-		b = []
+		b = np.zeros(len(non_zero_alpha_indexes))
+		b_index = 0
 	    	for index in non_zero_alpha_indexes: # iterate through list of indexes where alpha > const
 			b_dot_product = np.dot(img_training[index], np.transpose(w))
 			b_temp = labels[index] - np.dot(img_training[index], w)
-			b.append(b_temp)
+			b[b_index] = b_temp
+			b_index = b_index + 1
 		bias = b[0]
-		svm_b.append(bias)
+		svm_b[class_i - 1] = bias
 	
 	return svm_w, svm_b
 
@@ -219,10 +223,10 @@ def main():
 	accuracies_linear = np.zeros(120)
 	average_accuracy_quadratic = 0
 	accuracies_quadratic = np.zeros(120)
-	counter = 1
+	counter = 0
 	for combo in combinations:
 		print "\n----------------------------------------------------------------------"
-		print "Running combination {}. This is {} out of {}.".format(combo, counter, 120)
+		print "Running combination {}. This is {} out of {}.".format(combo, counter + 1, 120)
 		print "----------------------------------------------------------------------\n"
 		# Training data
 		img_training = np.concatenate((image_groups[combo[0]], image_groups[combo[1]], image_groups[combo[2]], image_groups[combo[3]]))
