@@ -29,12 +29,15 @@ Function blocks:
 -	Breaks images into 5 image groups for five-fold cross validation
 -	Iterates through unique combinations of 5 image groups and calls linear and polynomial svm() to train on and test on these unique combinations
 -	Reports average accuracies for linear and polynomial implementations
+
 ---	svm(num_of_people, img_training, classes_training, img_testing, classes_testing, polynomial_flag = False, polynomial_degree = 2.0)
 -	Calls training() and testing() function blocks
 -	Returns accuracy
+
 ---	training(img_training, classes_training, num_of_people, polynomial_flag = False, polynomial_degree = 2.0)
 -	Calculates a model (w and b) for every class using quadratic programming solver
 -	Returns a list of w’s and b’s each corresponding to one of the classes (40 people)
+
 ---	testing(img_testing, classes_testing, num_of_people, w, b)
 -	Tests each test images against every class (40 people) and reports on total of correctly and incorrectly classified images
 -	Returns accuracy
