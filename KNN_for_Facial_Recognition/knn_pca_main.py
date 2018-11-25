@@ -6,6 +6,17 @@ import math
 import random
 import itertools
 
+################################################################################
+# Calculate distance between values of two lists of the same size 
+#################################################################################
+def distance(list1, list2):
+	list_len = len(list1)
+	residual_squared_sum = 0
+	for i in range(list_len):
+		residual_squared_sum = residual_squared_sum + math.pow(list1[i] - list2[i], 2)
+	
+	return math.sqrt(residual_squared_sum)
+
 def training(img_training, classes_training, num_of_people, polynomial_flag = False, polynomial_degree = 2.0):
 	# Row image -> column images
 	img_training_t = np.transpose(img_training)	
@@ -183,9 +194,6 @@ def main():
 	# Convert images to type double
 	images = images.astype(np.double)
 	
-	# Convert image matrix to eigenfaces
-	eigenvalues, eigenfaces = faces_to_eigenfaces(images)
-	
 	# ----------------------------------------------
 	# BEGIN FIVE-FOLD CROSS VALIDATION PROCEDURE
 	# ----------------------------------------------
@@ -236,7 +244,7 @@ def main():
 	image_groups = [img_group_0, img_group_1, img_group_2, img_group_3, img_group_4]
 	image_classes_groups = [class_group_0, class_group_1, class_group_2, class_group_3, class_group_4]
 
-	print "\nRunning SVMs..."		
+	print "\nRunning KNNs..."		
 	
 	# Use different unique combinations of the 5 groups to perform training and testing - average accuracy
 	combinations = set(itertools.permutations([0, 1, 2, 3, 4]))
@@ -251,28 +259,30 @@ def main():
 		print "----------------------------------------------------------------------\n"
 		# Training data
 		img_training = np.concatenate((image_groups[combo[0]], image_groups[combo[1]], image_groups[combo[2]], image_groups[combo[3]]))
+		# Convert image matrix to eigenfaces
 		classes_training = np.concatenate((image_classes_groups[combo[0]], image_classes_groups[combo[1]], image_classes_groups[combo[2]], image_classes_groups[combo[3]]))
 		# Testing data
 		img_testing = np.array(image_groups[combo[4]], np.double)
 		classes_testing = np.array(image_classes_groups[combo[4]])
 		# Run linear SVM		
-		print "\nLinear SVM...\n"		
-		accuracies_linear[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing)
+		print "\nPCA + KNN...\n"
+		eigenvalues_training, eigenfaces_training = faces_to_eigenfaces(img_training)
+		accuracies_pca_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing) # TO DO 
 		# Run quadratic (degree = 2) SVM
-		print "\nQuadratic SVM...\n"
-		accuracies_quadratic[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing, True, 2.0)
+		print "\nLDA + KNN...\n"
+		accuracies_lda_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing, True, 2.0) # TO DO 
 		counter = counter + 1	
 	
 	print "\nCombinations:\n"
 	print combinations 
-	print "\nLinear accuracies:\n"
-	print accuracies_linear
-	print "\nQuadratic accuracies:\n"
-	print accuracies_quadratic
-	average_accuracy_linear = sum(accuracies_linear) / 120
-	print "\nAverage linear accuracy: {}%.\n".format(average_accuracy_linear)
-	average_accuracy_quadratic = sum(accuracies_quadratic) / 120
-	print "\nAverage quadratic accuracy: {}%.\n".format(average_accuracy_quadratic)
+	print "\nPCA + KNN accuracies:\n"
+	print accuracies_pca_knn
+	print "\nLDA + KNN accuracies:\n"
+	print accuracies_lda_knn
+	average_accuracy_linear = sum(accuracies_pca_knn) / 120
+	print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_linear)
+	average_accuracy_quadratic = sum(accuracies_lda_knn) / 120
+	print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_quadratic)
 
 if __name__ == "__main__":
 	main()
