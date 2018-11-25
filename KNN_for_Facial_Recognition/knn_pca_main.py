@@ -7,6 +7,46 @@ import random
 import itertools
 
 ################################################################################
+# Calculate eigenfaces and their according eigenvalues
+#################################################################################
+def pca_analysis(T):
+	# Calculate mean face
+	T_mean = T.mean(1)
+	
+	# Subtract mean from each column vector in 
+	A = T - T_mean
+	
+	# Calculate convergence matrix
+	AtA = np.matmul(np.transpose(A), A)
+	
+	# Calculate eigenvalues and eigenfaces of AtA
+	eigenvalues, eigenfaces = np.linalg.eig(AtA)
+	
+	return eigenvalues, eigenfaces, T_mean
+
+################################################################################
+# Calculate minimum number of eigenvectors needed to capture min_variance
+#################################################################################
+def pca_reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
+	eigenvalues_training_len = len(eigenvalues_training)
+	eigenvalues_training_sum = np.sum(eigenvalues_training)
+	for k in range(eigenvalues_training_len):
+		v = np.sum(eigenvalues_training[0:k]) / eigenvalues_training_sum
+		if v >= min_variance:
+			return k + 1 # Add one because k count starts at 0
+
+################################################################################
+# Extract and return features from each image in images 
+#################################################################################
+def pca_extract_features(U, images, m):
+	U_T = np.transpose(U)
+	W_training = []
+	for img in np.transpose(images):
+		W_training.append(np.matmul(U_T, (img - m)))
+	
+	return np.array(W_training)
+			
+################################################################################
 # Calculate distance between values of two lists of the same size 
 #################################################################################
 def distance(list1, list2):
@@ -16,150 +56,6 @@ def distance(list1, list2):
 		residual_squared_sum = residual_squared_sum + math.pow(list1[i] - list2[i], 2)
 	
 	return math.sqrt(residual_squared_sum)
-
-def training(img_training, classes_training, num_of_people, polynomial_flag = False, polynomial_degree = 2.0):
-	# Row image -> column images
-	img_training_t = np.transpose(img_training)	
-	rows, columns = img_training_t.shape
-
-	# Constants
-	c = 2.0
-
-	# These variables will collect w's and b's for each class
-	svm_w = np.zeros((num_of_people, rows))
-	svm_b = np.zeros(num_of_people)	
-	
-	# Column to row images
-	img_training_t = np.array(img_training_t, np.double)
-	
-	# Iterate through 40 classes
-	for class_i in range(1, num_of_people + 1, 1):
-		# Create label list where images in this class will be labeled as 1 and images not in this class will be labeled as -1
-		labels = np.zeros(columns)
-		labels_index = 0
-		for my_c in classes_training:
-			if my_c == class_i:
-				labels[labels_index] = 1
-			else:
-				labels[labels_index] = -1
-			labels_index = labels_index + 1
-
-		# Labels has to be of type double for quadratic programming solver
-		labels = np.array(labels, np.double)		
-
-		# Calculate K
-		K = matrix(np.zeros((columns, columns)))
-		for i in range(columns):
-			for j in range(columns):
-				# Choose between linear and polynomial svm
-				if polynomial_flag == True:
-					K[i, j] = math.pow((np.dot(img_training_t[:, i], img_training_t[:, j]) + 1.0), polynomial_degree)
-				else: # Linear and aslo default
-					# For linear SVM, single K value is calculated using dot product of two column vectors from training data			
-					K[i, j] = np.dot(img_training_t[:, i], img_training_t[:, j])
-				
-				
-
-		# Calculate variables needed for quadratic programming solver
-	        P = matrix(np.outer(labels, labels) * K)
-		q = matrix(- np.ones(columns))
-		G = matrix(np.vstack((np.diag(-np.ones(columns)), np.identity(columns))))
-		h = matrix(np.hstack((np.zeros(columns), np.ones(columns) * c)))
-		A = matrix(labels, (1, columns))
-		b = matrix(np.zeros(1))		
-		
-		print "Running quadratic programming solver for class s{}...".format(class_i)
-	
-		# Calculate alfas using quadratic programming solver
-		solvers.options['show_progress'] = False        	
-		solution = solvers.qp(P, q, G, h, A, b)
-		alphas = np.array(solution['x'], np.double)		
-		alpha_min = min(alphas)
-
-		# Calculate w		
-		w = np.sum(alphas * labels[:, None] * img_training, axis = 0)
-		svm_w[class_i - 1] = w	
-		# Calculate b
-		non_zero_alpha_indexes = (np.where(alphas > alpha_min))[0]
-		b = np.zeros(len(non_zero_alpha_indexes))
-		b_index = 0
-	    	for index in non_zero_alpha_indexes: # iterate through list of indexes where alpha > const
-			b_dot_product = np.dot(img_training[index], np.transpose(w))
-			b_temp = labels[index] - np.dot(img_training[index], w)
-			b[b_index] = b_temp
-			b_index = b_index + 1
-		bias = b[0]
-		svm_b[class_i - 1] = bias
-	
-	return svm_w, svm_b
-
-def testing(img_testing, classes_testing, num_of_people, w, b):
-	rows, columns = img_testing.shape # every row is an image we have to test
-
-	total_correct = 0.0
-	total_incorrect = 0.0
-
-	# For every image in testing data - check that it correctly classifies
-	for r in range(rows):
-		img = img_testing[r]
-		for i in range(num_of_people):
-			test = np.dot(w[i], img) + b[i]
-			current_class = classes_testing[r]
-			if ((test > 0) & (i + 1 == current_class)): # True Positive - Classified Correctly
-				total_correct = total_correct + 1.0
-				#print "\nImage {} classified true positive for class {}.\n".format(r + 1, current_class)
-			elif ((test <= 0) & (i + 1 != current_class)): # True Negative - Classified Correctly
-				total_correct = total_correct + 1.0
-				#print "\nImage {} classified true negative for class {}.\n".format(r + 1, current_class)
-			elif ((test > 0) & (i + 1 != current_class)): # False Positive - Classified Incorrectly
-				total_incorrect = total_incorrect + 1.0
-				#print "\n--Image {} classified false positive for class {}.--\n".format(r + 1, current_class)		
-			else: # False Negative - Classified Incorrectly
-				total_incorrect = total_incorrect + 1.0
-				#print "\n--Image {} classified false negative as class {}.--\n".format(r + 1, current_class)		
-		
-	print "\nTotal correct classifications: {}.\n".format(total_correct)
-	print "\nTotal incorrect classifications: {}.\n".format(total_incorrect)
-	accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
-	print "\nAccuracy: {}%.\n".format(accuracy)
-	return accuracy
-
-def svm(num_of_people, img_training, classes_training, img_testing, classes_testing, polynomial_flag = False, polynomial_degree = 2.0):
-	# ----------------------------------------------
-	# TRAINING
-	# ----------------------------------------------
-	
-	print "\nTraining..."
-
-	w, b = training(img_training, classes_training, num_of_people, polynomial_flag, polynomial_degree) # w and b are in order of class (1 through 40)
-
-	# ----------------------------------------------
-	# TESTING
-	# ----------------------------------------------
-		
-	print "\nTesting..."
-
-	accuracy = testing(img_testing, classes_testing, num_of_people, w, b)
-	
-	return accuracy
-
-def faces_to_eigenfaces(faces):
-	# row faces to column faces -  each face is a column vector
-	X = np.transpose(faces)
-	
-	# Calculate mean face
-	X_mean = X.mean(1)
-	
-	# Subtract mean from each column vector in 
-	A = X - X_mean
-	
-	# Calculate convergence matrix
-	AtA = np.matmul(np.transpose(A), A)
-	
-	# Calculate eigenvalues and eigenfaces of AtA
-	eigenvalues, eigenfaces = np.linalg.eig(AtA)
-	
-	return eigenvalues, eigenfaces
 	
 def main():
 
@@ -264,25 +160,37 @@ def main():
 		# Testing data
 		img_testing = np.array(image_groups[combo[4]], np.double)
 		classes_testing = np.array(image_classes_groups[combo[4]])
-		# Run linear SVM		
+		# Run PCA		
 		print "\nPCA + KNN...\n"
-		eigenvalues_training, eigenfaces_training = faces_to_eigenfaces(img_training)
-		accuracies_pca_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing) # TO DO 
-		# Run quadratic (degree = 2) SVM
-		print "\nLDA + KNN...\n"
-		accuracies_lda_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing, True, 2.0) # TO DO 
-		counter = counter + 1	
+		# Calculate eigenfaces and their acccording eigenvalues 
+		eigenvalues_training, eigenfaces_training, m = pca_analysis(np.transpose(img_training))
+		# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
+		k = pca_reduce_number_of_eigenvectors(eigenvalues_training, 0.95)
+		# Dominant eigenvectors
+		U = eigenfaces_training[:, 0 : k]
+		print "\n U dimensions: {}\n".format()
+		# Feature extraction
+		W_training = extract_features(U, img_training, m)	
+		# Face recognition
+		W_testing = extract_features(U, img_testing, m)
+		#accuracies_pca_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing) # TO DO 
+		# PCA + KNN
+		# https://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
+		
+		# Run LDA
+		#print "\nLDA + KNN...\n"
+
 	
-	print "\nCombinations:\n"
-	print combinations 
-	print "\nPCA + KNN accuracies:\n"
-	print accuracies_pca_knn
-	print "\nLDA + KNN accuracies:\n"
-	print accuracies_lda_knn
-	average_accuracy_linear = sum(accuracies_pca_knn) / 120
-	print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_linear)
-	average_accuracy_quadratic = sum(accuracies_lda_knn) / 120
-	print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_quadratic)
+	#print "\nCombinations:\n"
+	#print combinations 
+	#print "\nPCA + KNN accuracies:\n"
+	#print accuracies_pca_knn
+	#print "\nLDA + KNN accuracies:\n"
+	#print accuracies_lda_knn
+	#average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
+	#print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
+	#average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
+	#print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)
 
 if __name__ == "__main__":
 	main()
