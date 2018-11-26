@@ -42,7 +42,7 @@ def pca_analysis(T):
 	eigenvalues, eigenfaces = np.linalg.eig(AtA)
 	
 	# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
-	k = pca_reduce_number_of_eigenvectors(eigenvalues, 0.95)
+	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
 
 	# Dominant eigenvectors
 	V = eigenfaces[:, 0 : k]
@@ -54,7 +54,7 @@ def pca_analysis(T):
 ################################################################################
 # Calculate minimum number of eigenvectors needed to capture min_variance
 #################################################################################
-def pca_reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
+def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 	eigenvalues_training_len = len(eigenvalues_training)
 	eigenvalues_training_sum = np.sum(eigenvalues_training)
 	for k in range(eigenvalues_training_len):
@@ -84,6 +84,67 @@ def normalize(data):
 		data[r] = (data[r] - (data[r]).mean(0)) / np.std(data[r])
 		
 	return data
+
+def lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z):	
+	# Step 1 - calculate separability between different classes (distance between means of different classes)
+	# "Between-Class Matrix (Sb)
+	# Step 2 - calculate distance between means and the samples of each class
+	# "Within-Class Matrix (Sw)
+	z = img_training.shape[0]
+	Sb, Sw = lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z)
+	
+	# Step 3 - Construct the lower dimensional space (Vk) that 
+	# Maximizes Between-Class Matrix and minimizes Within-Class Matrix
+	Swt = np.transpose(Sw)
+	SwtSb = np.dot(Swt, Sb)
+	eigenvalues, eigenvectors = np.linalg.eigh(SwtSb)
+	# Decide how many eigenvectors are enough to represent variance in our training set - at least 95 % variance
+	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
+	# Dominant eigenvectors
+	Vk = eigenvectors[:, 0 : k]
+	Vk = np.transpose(Vk)
+	
+	# Step 4 - Project our original data into lower-dimensionalspace
+	Vk_training = np.dot(Vk, img_training)
+	Vk_testing = np.dot(Vk, img_testing)
+
+	# Normalize data
+	#Vk_training = normalize(Vk_training)	
+	#Vk_testing = normalize(Vk_testing)
+	
+	return Vk_training, Vk_testing
+
+def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z):
+	# Compute mean of each class
+	img_rows, img_columns = img_training.shape
+	m = np.zeros((num_of_people, img_columns))
+	classes_training = classes_training.astype(np.int)
+	for r in range(img_rows):
+		m[classes_training[r] - 1] = m[classes_training[r] - 1] + img_training[r]
+	for r in range(num_of_people):
+		m[r] = m[r] / num_of_faces_per_person
+	
+	# Compute total mean of all data
+	m_total = (img_training.mean(0))[0]
+	
+	# Calculate separability between different classes (distance between means of different classes)
+	# "Between-Class Matrix (Sb)
+	Sb = np.zeros((z, z))
+	for r in range(num_of_people):
+		class_mean_minus_total = m[r] - m_total
+		dot_product = np.dot(class_mean_minus_total, np.transpose(class_mean_minus_total))
+		Sb = Sb + dot_product * float(5)
+	
+	# Calculate distance between means and the samples of each class
+	# "Within-Class Matrix (Sw)	
+	Sw = np.zeros((z, z))
+	for r in range(num_of_people):
+		mean = m[r]
+		for img_r in range(img_rows): 
+			img_minus_class_mean = img_training[img_r] - mean
+			dot_product = np.dot(img_minus_class_mean, np.transpose(img_minus_class_mean))
+			Sw = Sw + dot_product * float(5)
+	return Sb, Sw
 	
 ################################################################################
 # Main knn function
@@ -266,12 +327,15 @@ def main():
 		
 		# Run LDA
 		#print "\nLDA + KNN...\n"
-		#W = lda(img_training, classes_training)
-		#W_training = np.dot(W, img_training)
-		#W_testing = np.dot(W, img_testing)
+		z = img_training.shape[0]
+		Vk_training, Vk_testing = lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z)
+		
 		
 		# Run PCA + LDA
 		#print "\nPCA + LDA + KNN...\n"
+		accuracies_lda_knn[counter]  = knn(Vk_training, classes_training, Vk_testing, classes_testing)
+		
+		break
 		
 		counter = counter + 1
 		
