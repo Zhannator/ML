@@ -1,4 +1,5 @@
 # Public libraries
+import sys
 import cv2
 import numpy as np
 import math
@@ -143,13 +144,19 @@ def main():
 	num_of_faces = num_of_people * num_of_faces_per_person
 	images = np.zeros((num_of_faces, num_of_pixels)) # all images, each as row vector
 	classes = np.zeros(num_of_faces) # all classes
-
+	
+	if (len(sys.argv) > 1):
+		if (sys.argv[1] != "-resize"):
+			print "\nAll of the images will be resized form (112x92) to (56x46)...\n"
 	# Iterate through facial images and separate them into training and testing matrixes (80 : 20 ratio) with each row being a flat version of image
 	counter = 0
 	for i in range(1, num_of_people + 1, 1):
 		for j in range(1, num_of_faces_per_person + 1, 1):
 			# Read image
 			img = cv2.imread("data/s" + str(i) + "/" + str(j) + ".pgm", 0) * (1.0 / 255.0)
+			if (len(sys.argv) > 1):
+				if (sys.argv[1] != "-resize"):
+					img = cv2.resize(img, (56, 46)) 
 			rows, columns = img.shape
 			# 2D image matrix to 1D row vector
 			images[counter] = (np.array(img)).flatten()
@@ -218,6 +225,8 @@ def main():
 	accuracies_pca_knn = np.zeros(120)
 	average_accuracy_lda_knn = 0
 	accuracies_lda_knn = np.zeros(120)
+	average_accuracy_pca_lda_knn = 0
+	accuracies_pca_lda_knn = np.zeros(120)
 	counter = 0
 	for combo in combinations:
 		print "\n----------------------------------------------------------------------"
@@ -257,19 +266,29 @@ def main():
 		
 		# Run LDA
 		#print "\nLDA + KNN...\n"
+		#W = lda(img_training, classes_training)
+		#W_training = np.dot(W, img_training)
+		#W_testing = np.dot(W, img_testing)
+		
+		# Run PCA + LDA
+		#print "\nPCA + LDA + KNN...\n"
 		
 		counter = counter + 1
 		
-	print "\nCombinations:\n"
-	print combinations 
+	#print "\nCombinations:\n"
+	#print combinations 
 	print "\nPCA + KNN accuracies:\n"
 	print accuracies_pca_knn
-	#print "\nLDA + KNN accuracies:\n"
-	#print accuracies_lda_knn
+	print "\nLDA + KNN accuracies:\n"
+	print accuracies_lda_knn
+	print "\nPCA + LDA + KNN accuracies:\n"
+	print accuracies_pca_lda_knn
 	average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
 	print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
-	#average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
-	#print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)
-
+	average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
+	print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)
+	average_accuracy_pca_lda_knn = sum(accuracies_pca_lda_knn) / 120
+	print "\nAverage PCA + LDA + KNN accuracy: {}%.\n".format(average_accuracy_pca_lda_knn)
+	
 if __name__ == "__main__":
 	main()
