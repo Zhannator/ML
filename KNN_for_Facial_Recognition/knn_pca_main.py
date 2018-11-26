@@ -10,18 +10,29 @@ import itertools
 #################################################################################
 def pca_analysis(T):
 	# Calculate mean face
-	T_mean = T.mean(1)
+	m = (T.mean(1))[0]
 	
 	# Subtract mean from each column vector in 
-	A = T - T_mean[0]
+	A = T - m
+	
+	#print "\nA Shape: {}\n".format(A.shape)
 	
 	# Calculate convergence matrix
 	AtA = np.matmul(np.transpose(A), A)
 	
+	#print "\nAtA Shape: {}\n".format(AtA.shape)
+	
 	# Calculate eigenvalues and eigenfaces of AtA
 	eigenvalues, eigenfaces = np.linalg.eig(AtA)
 	
-	return eigenvalues, eigenfaces, T_mean
+	# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
+	k = pca_reduce_number_of_eigenvectors(eigenvalues, 0.95)
+	# Dominant eigenvectors
+	V = eigenfaces[:, 0 : k]
+	# Calculate U (most important eigenvectors from AAt) by multiplying A and V (only most important eigenvectors)
+	U = np.matmul(A, V)
+
+	return U, m
 
 ################################################################################
 # Calculate minimum number of eigenvectors needed to capture min_variance
@@ -35,18 +46,21 @@ def pca_reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 			return k + 1 # Add one because k count starts at 0
 
 ################################################################################
-# Extract and return features from each image in images 
+# Extract and return features from each image in images (a.k.a. Projection)
 #################################################################################
 def pca_extract_features(U, images, m):
 	U_T = np.transpose(U)
 	W_training = []
 	num_images = len(images)
-	print "\nNum_images: {}\n".format(num_images)
+	images_unique = images - m
 	for i in range(num_images):
-		W_training.append(np.dot(U_T, (images[i] - m)))
-	
+		W_training.append(np.dot(U_T, images_unique[i]))
 	return np.array(W_training)
-			
+	
+def knn_testing(W_training, classes_training, W_testing, classes_testing):
+	print "Testing KNN"
+
+	
 ################################################################################
 # Calculate distance between values of two lists of the same size 
 #################################################################################
@@ -80,7 +94,7 @@ def main():
 	for i in range(1, num_of_people + 1, 1):
 		for j in range(1, num_of_faces_per_person + 1, 1):
 			# Read image
-			img = cv2.imread("data/s" + str(i) + "/" + str(j) + ".pgm", 0)
+			img = cv2.imread("data/s" + str(i) + "/" + str(j) + ".pgm", 0) * (1.0 / 255.0)
 			rows, columns = img.shape
 			# 2D image matrix to 1D row vector
 			images[counter] = (np.array(img)).flatten()
@@ -145,10 +159,10 @@ def main():
 	
 	# Use different unique combinations of the 5 groups to perform training and testing - average accuracy
 	combinations = set(itertools.permutations([0, 1, 2, 3, 4]))
-	average_accuracy_linear = 0
-	accuracies_linear = np.zeros(120)
-	average_accuracy_quadratic = 0
-	accuracies_quadratic = np.zeros(120)
+	average_accuracy_pca_knn = 0
+	accuracies_pca_knn = np.zeros(120)
+	average_accuracy_lda_knn = 0
+	accuracies_lda_knn = np.zeros(120)
 	counter = 0
 	for combo in combinations:
 		print "\n----------------------------------------------------------------------"
@@ -163,21 +177,15 @@ def main():
 		classes_testing = np.array(image_classes_groups[combo[4]])
 		# Run PCA		
 		print "\nPCA + KNN...\n"
-		# Calculate eigenfaces and their acccording eigenvalues 
-		eigenvalues_training, eigenfaces_training, m = pca_analysis(np.transpose(img_training))
-		# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
-		k = pca_reduce_number_of_eigenvectors(eigenvalues_training, 0.95)
-		# Dominant eigenvectors
-		U = eigenfaces_training[:, 0 : k]
-		print "\n U dimensions: {}\n".format(U.shape)
+		U, m = pca_analysis(np.transpose(img_training))
+		#print "\nU dimensions: {}\n".format(U.shape)
 		# Feature extraction
 		W_training = pca_extract_features(U, img_training, m)	
 		# Face recognition
 		W_testing = pca_extract_features(U, img_testing, m)
-		#accuracies_pca_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing) # TO DO 
-		# PCA + KNN
-		# https://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
-		print W_testing
+		# KNN
+		accuracies_pca_knn[counter]  = knn_testing(W_training, classes_training, W_testing, classes_testing)
+		
 		# Run LDA
 		#print "\nLDA + KNN...\n"
 
