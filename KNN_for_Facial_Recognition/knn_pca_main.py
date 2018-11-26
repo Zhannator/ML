@@ -1,7 +1,6 @@
 # Public libraries
 import cv2
 import numpy as np
-from cvxopt import matrix, solvers
 import math
 import random
 import itertools
@@ -14,7 +13,7 @@ def pca_analysis(T):
 	T_mean = T.mean(1)
 	
 	# Subtract mean from each column vector in 
-	A = T - T_mean
+	A = T - T_mean[0]
 	
 	# Calculate convergence matrix
 	AtA = np.matmul(np.transpose(A), A)
@@ -41,8 +40,10 @@ def pca_reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 def pca_extract_features(U, images, m):
 	U_T = np.transpose(U)
 	W_training = []
-	for img in np.transpose(images):
-		W_training.append(np.matmul(U_T, (img - m)))
+	num_images = len(images)
+	print "\nNum_images: {}\n".format(num_images)
+	for i in range(num_images):
+		W_training.append(np.dot(U_T, (images[i] - m)))
 	
 	return np.array(W_training)
 			
@@ -168,15 +169,15 @@ def main():
 		k = pca_reduce_number_of_eigenvectors(eigenvalues_training, 0.95)
 		# Dominant eigenvectors
 		U = eigenfaces_training[:, 0 : k]
-		print "\n U dimensions: {}\n".format()
+		print "\n U dimensions: {}\n".format(U.shape)
 		# Feature extraction
-		W_training = extract_features(U, img_training, m)	
+		W_training = pca_extract_features(U, img_training, m)	
 		# Face recognition
-		W_testing = extract_features(U, img_testing, m)
+		W_testing = pca_extract_features(U, img_testing, m)
 		#accuracies_pca_knn[counter] = svm(num_of_people, img_training, classes_training, img_testing, classes_testing) # TO DO 
 		# PCA + KNN
 		# https://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/
-		
+		print W_testing
 		# Run LDA
 		#print "\nLDA + KNN...\n"
 
