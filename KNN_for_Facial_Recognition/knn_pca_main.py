@@ -4,6 +4,21 @@ import numpy as np
 import math
 import random
 import itertools
+from sklearn.neighbors import KNeighborsClassifier
+
+################################################################################
+# Main pca function
+#################################################################################
+def pca(img_training, img_testing):
+	# Feature extraction using PCA
+	U, m = pca_analysis(np.transpose(img_training))
+	W_training = pca_extract_features(U, img_training, m)	
+	W_testing = pca_extract_features(U, img_testing, m)
+	# Normalize data
+	W_training = normalize(W_training)	
+	W_testing = normalize(W_testing)
+	
+	return W_training, W_testing
 
 ################################################################################
 # Calculate eigenfaces and their according eigenvalues
@@ -12,7 +27,7 @@ def pca_analysis(T):
 	# Calculate mean face
 	m = (T.mean(1))[0]
 	
-	# Subtract mean from each column vector in 
+	# Subtract mean from each column vector in (a.k.a. center images)
 	A = T - m
 	
 	#print "\nA Shape: {}\n".format(A.shape)
@@ -27,6 +42,7 @@ def pca_analysis(T):
 	
 	# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
 	k = pca_reduce_number_of_eigenvectors(eigenvalues, 0.95)
+
 	# Dominant eigenvectors
 	V = eigenfaces[:, 0 : k]
 	# Calculate U (most important eigenvectors from AAt) by multiplying A and V (only most important eigenvectors)
@@ -56,8 +72,22 @@ def pca_extract_features(U, images, m):
 	for i in range(num_images):
 		W_training.append(np.dot(U_T, images_unique[i]))
 	return np.array(W_training)
+
+################################################################################
+# Normalize data using mean and standard deviation
+#################################################################################	
+def normalize(data):
+	# Column-wise subtract the mean and divide by the std deviation
+	rows, columns = data.shape
+	for r in range(rows):
+		data[r] = (data[r] - (data[r]).mean(0)) / np.std(data[r])
+		
+	return data
 	
-def knn_testing(W_training, classes_training, W_testing, classes_testing):
+################################################################################
+# Main knn function
+#################################################################################	
+def knn(W_training, classes_training, W_testing, classes_testing):
 	print "Testing KNN"
 	
 	rows_training, columns_training = W_testing.shape # every row is an image we have to test
@@ -202,27 +232,42 @@ def main():
 		classes_testing = np.array(image_classes_groups[combo[4]])
 		# Run PCA		
 		print "\nPCA + KNN...\n"
-		U, m = pca_analysis(np.transpose(img_training))
-		#print "\nU dimensions: {}\n".format(U.shape)
-		# Feature extraction
-		W_training = pca_extract_features(U, img_training, m)	
-		# Face recognition
-		W_testing = pca_extract_features(U, img_testing, m)
-		# KNN
-		accuracies_pca_knn[counter]  = knn_testing(W_training, classes_training, W_testing, classes_testing)
+		# Feature extraction using pca
+		W_training, W_testing = pca(img_training, img_testing)
+		# Face recognition using KNN
+		accuracies_pca_knn[counter]  = knn(W_training, classes_training, W_testing, classes_testing)
+		'''
+		# Test to compare accuracy to sklearn algorithm
+		knn = KNeighborsClassifier(n_neighbors = 1)
+		knn.fit(W_training, classes_training)
+		pred = knn.predict(W_testing)
+		rows_testing, cols_testing = W_testing.shape
+		total_correct = 0.0
+		total_incorrect = 0.0	
+		for r in range(rows_testing):
+			# Check if the classification is correct
+			if pred[r] == classes_testing[r]:
+				total_correct = total_correct + 1.0
+			else:
+				total_incorrect = total_incorrect + 1.0
+		accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+		print "\nAccuracy (sklearn): {}%.\n".format(accuracy)
+		break
+		'''
 		
 		# Run LDA
 		#print "\nLDA + KNN...\n"
-
-	
-	#print "\nCombinations:\n"
-	#print combinations 
-	#print "\nPCA + KNN accuracies:\n"
-	#print accuracies_pca_knn
+		
+		counter = counter + 1
+		
+	print "\nCombinations:\n"
+	print combinations 
+	print "\nPCA + KNN accuracies:\n"
+	print accuracies_pca_knn
 	#print "\nLDA + KNN accuracies:\n"
 	#print accuracies_lda_knn
-	#average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
-	#print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
+	average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
+	print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
 	#average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
 	#print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)
 
