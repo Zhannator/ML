@@ -90,8 +90,10 @@ def lda(img_training, classes_training, img_testing, num_of_people, num_of_faces
 	# "Between-Class Matrix (Sb)
 	# Step 2 - calculate distance between means and the samples of each class
 	# "Within-Class Matrix (Sw)
-	z = img_training.shape[0]
+	z = img_training.shape[1]
 	Sb, Sw = lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z)
+	print Sb.shape
+	print Sw.shape
 	
 	# Step 3 - Construct the lower dimensional space (Vk) that 
 	# Maximizes Between-Class Matrix and minimizes Within-Class Matrix
@@ -103,6 +105,10 @@ def lda(img_training, classes_training, img_testing, num_of_people, num_of_faces
 	# Dominant eigenvectors
 	Vk = eigenvectors[:, 0 : k]
 	Vk = np.transpose(Vk)
+	
+	print Vk.shape
+	print img_training.shape
+	print img_testing.shape
 	
 	# Step 4 - Project our original data into lower-dimensionalspace
 	Vk_training = np.dot(Vk, img_training)
@@ -132,7 +138,9 @@ def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_pe
 	Sb = np.zeros((z, z))
 	for r in range(num_of_people):
 		class_mean_minus_total = m[r] - m_total
-		dot_product = np.dot(class_mean_minus_total, np.transpose(class_mean_minus_total))
+		class_mean_minus_total_T = np.transpose(class_mean_minus_total)
+		print class_mean_minus_total.shape
+		outer_product = np.outer(class_mean_minus_total, class_mean_minus_total_T)
 		Sb = Sb + dot_product * float(5)
 	
 	# Calculate distance between means and the samples of each class
@@ -142,8 +150,9 @@ def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_pe
 		mean = m[r]
 		for img_r in range(img_rows): 
 			img_minus_class_mean = img_training[img_r] - mean
-			dot_product = np.dot(img_minus_class_mean, np.transpose(img_minus_class_mean))
+			outer_product = np.outer(img_minus_class_mean, np.transpose(img_minus_class_mean))
 			Sw = Sw + dot_product * float(5)
+			
 	return Sb, Sw
 	
 ################################################################################
