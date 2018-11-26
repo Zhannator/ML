@@ -59,8 +59,33 @@ def pca_extract_features(U, images, m):
 	
 def knn_testing(W_training, classes_training, W_testing, classes_testing):
 	print "Testing KNN"
-
 	
+	rows_training, columns_training = W_testing.shape # every row is an image we have to test
+	rows_testing, columns_testing = W_testing.shape # every row is an image we have to test
+
+	total_correct = 0.0
+	total_incorrect = 0.0
+
+	# For every reduced dimension image in W testing - check that it correctly classifies
+	for r_testing in range(rows_testing):
+		img_reduced = W_testing[r_testing]
+		distances = np.zeros(rows_training)
+		for r_training in range(rows_training):
+			distances[r_training] = distance(img_reduced, W_training[r_training])
+		# Check what this image should be classified as based on minimum distance
+		classification = classes_training[np.argmin(distances)]
+		# Check if the classification is correct
+		if classification == classes_testing[r_testing]:
+			total_correct = total_correct + 1.0
+		else:
+			total_incorrect = total_incorrect + 1.0
+		
+	print "\nTotal correct classifications: {}.\n".format(total_correct)
+	print "\nTotal incorrect classifications: {}.\n".format(total_incorrect)
+	accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+	print "\nAccuracy: {}%.\n".format(accuracy)
+	return accuracy	
+
 ################################################################################
 # Calculate distance between values of two lists of the same size 
 #################################################################################
