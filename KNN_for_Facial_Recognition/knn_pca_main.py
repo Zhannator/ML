@@ -5,170 +5,20 @@ import numpy as np
 import math
 import random
 import itertools
-from sklearn.neighbors import KNeighborsClassifier
+#from sklearn.neighbors import KNeighborsClassifier
 
-################################################################################
-# Main pca function
-#################################################################################
-def pca(img_training, img_testing):
-	# Feature extraction using PCA
-	U, m = pca_analysis(np.transpose(img_training))
-	W_training = pca_extract_features(U, img_training, m)	
-	W_testing = pca_extract_features(U, img_testing, m)
-	# Normalize data
-	W_training = normalize(W_training)	
-	W_testing = normalize(W_testing)
-	
-	return W_training, W_testing
-
-################################################################################
-# Calculate eigenfaces and their according eigenvalues
-#################################################################################
-def pca_analysis(T):
-	# Calculate mean face
-	m = (T.mean(1))[0]
-	
-	# Subtract mean from each column vector in (a.k.a. center images)
-	A = T - m
-	
-	#print "\nA Shape: {}\n".format(A.shape)
-	
-	# Calculate convergence matrix
-	AtA = np.matmul(np.transpose(A), A)
-	
-	#print "\nAtA Shape: {}\n".format(AtA.shape)
-	
-	# Calculate eigenvalues and eigenfaces of AtA
-	eigenvalues, eigenfaces = np.linalg.eig(AtA)
-	
-	# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
-	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
-
-	# Dominant eigenvectors
-	V = eigenfaces[:, 0 : k]
-	# Calculate U (most important eigenvectors from AAt) by multiplying A and V (only most important eigenvectors)
-	U = np.matmul(A, V)
-
-	return U, m
-
-################################################################################
-# Calculate minimum number of eigenvectors needed to capture min_variance
-#################################################################################
-def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
-	eigenvalues_training_len = len(eigenvalues_training)
-	eigenvalues_training_sum = np.sum(eigenvalues_training)
-	for k in range(eigenvalues_training_len):
-		v = np.sum(eigenvalues_training[0:k]) / eigenvalues_training_sum
-		if v >= min_variance:
-			return k + 1 # Add one because k count starts at 0
-
-################################################################################
-# Extract and return features from each image in images (a.k.a. Projection)
-#################################################################################
-def pca_extract_features(U, images, m):
-	U_T = np.transpose(U)
-	W_training = []
-	num_images = len(images)
-	images_unique = images - m
-	for i in range(num_images):
-		W_training.append(np.dot(U_T, images_unique[i]))
-	return np.array(W_training)
-
-################################################################################
-# Normalize data using mean and standard deviation
-#################################################################################	
-def normalize(data):
-	# Column-wise subtract the mean and divide by the std deviation
-	rows, columns = data.shape
-	for r in range(rows):
-		data[r] = (data[r] - (data[r]).mean(0)) / np.std(data[r])
-		
-	return data
-
-def lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z):	
-	# Step 1 - calculate separability between different classes (distance between means of different classes)
-	# "Between-Class Matrix (Sb)
-	# Step 2 - calculate distance between means and the samples of each class
-	# "Within-Class Matrix (Sw)
-	z = img_training.shape[1]
-	Sb, Sw = lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z)
-	print Sb.shape
-	print Sw.shape
-	
-	# Step 3 - Construct the lower dimensional space (Vk) that 
-	# Maximizes Between-Class Matrix and minimizes Within-Class Matrix
-	Swt = np.transpose(Sw)
-	SwtSb = np.dot(Swt, Sb)
-	eigenvalues, eigenvectors = np.linalg.eigh(SwtSb)
-	# Decide how many eigenvectors are enough to represent variance in our training set - at least 95 % variance
-	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
-	# Dominant eigenvectors
-	Vk = eigenvectors[:, 0 : k]
-	Vk = np.transpose(Vk)
-	
-	print Vk.shape
-	print img_training.shape
-	print img_testing.shape
-	
-	# Step 4 - Project our original data into lower-dimensionalspace
-	Vk_training = np.dot(Vk, img_training)
-	Vk_testing = np.dot(Vk, img_testing)
-
-	# Normalize data
-	#Vk_training = normalize(Vk_training)	
-	#Vk_testing = normalize(Vk_testing)
-	
-	return Vk_training, Vk_testing
-
-def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z):
-	# Compute mean of each class
-	img_rows, img_columns = img_training.shape
-	m = np.zeros((num_of_people, img_columns))
-	classes_training = classes_training.astype(np.int)
-	for r in range(img_rows):
-		m[classes_training[r] - 1] = m[classes_training[r] - 1] + img_training[r]
-	for r in range(num_of_people):
-		m[r] = m[r] / num_of_faces_per_person
-	
-	# Compute total mean of all data
-	m_total = (img_training.mean(0))[0]
-	
-	# Calculate separability between different classes (distance between means of different classes)
-	# "Between-Class Matrix (Sb)
-	Sb = np.zeros((z, z))
-	n = 8
-	for r in range(num_of_people):
-		class_mean_minus_total = m[r] - m_total
-		class_mean_minus_total_T = np.transpose(class_mean_minus_total)
-		print class_mean_minus_total
-		print class_mean_minus_total_T
-		outer_product = n * np.outer(class_mean_minus_total, class_mean_minus_total)
-		Sb = Sb + outer_product * float(5)
-	
-	# Calculate distance between means and the samples of each class
-	# "Within-Class Matrix (Sw)	
-	Sw = np.zeros((z, z))
-	for r in range(num_of_people):
-		mean = m[r]
-		for img_r in range(img_rows): 
-			img_minus_class_mean = img_training[img_r] - mean
-			outer_product = np.outer(img_minus_class_mean, np.transpose(img_minus_class_mean))
-			Sw = Sw + outer_product * float(5)
-			
-	return Sb, Sw
-	
 ################################################################################
 # Main knn function
-#################################################################################	
-def knn(W_training, classes_training, W_testing, classes_testing):
+################################################################################	
+def knn_1(W_training, classes_training, W_testing, classes_testing):
 	print "Testing KNN"
 	
-	rows_training, columns_training = W_testing.shape # every row is an image we have to test
+	rows_training, columns_training = W_training.shape # every row is an image we have to test
 	rows_testing, columns_testing = W_testing.shape # every row is an image we have to test
 
 	total_correct = 0.0
 	total_incorrect = 0.0
-
+	print rows_testing
 	# For every reduced dimension image in W testing - check that it correctly classifies
 	for r_testing in range(rows_testing):
 		img_reduced = W_testing[r_testing]
@@ -191,7 +41,7 @@ def knn(W_training, classes_training, W_testing, classes_testing):
 
 ################################################################################
 # Calculate distance between values of two lists of the same size 
-#################################################################################
+################################################################################
 def distance(list1, list2):
 	list_len = len(list1)
 	residual_squared_sum = 0
@@ -199,6 +49,160 @@ def distance(list1, list2):
 		residual_squared_sum = residual_squared_sum + math.pow(list1[i] - list2[i], 2)
 	
 	return math.sqrt(residual_squared_sum)
+
+################################################################################
+# Main pca function
+################################################################################
+def pca(img_training, img_testing):
+	# Feature extraction using PCA
+	U, m = pca_analysis(np.transpose(img_training))
+	W_training = pca_extract_features(U, img_training, m)	
+	W_testing = pca_extract_features(U, img_testing, m)
+
+	# Normalize data
+	W_training = pca_normalize(W_training)	
+	W_testing = pca_normalize(W_testing)
+	
+	return W_training, W_testing
+
+################################################################################
+# Calculate eigenfaces and their according eigenvalues
+################################################################################
+def pca_analysis(T):
+	# Calculate mean face
+	m = (T.mean(1))[0]
+	
+	# Subtract mean from each column vector in (a.k.a. center images)
+	A = T - m
+	
+	#print "\nA Shape: {}\n".format(A.shape)
+	
+	# Calculate convergence matrix
+	AtA = np.matmul(np.transpose(A), A)
+	
+	#print "\nAtA Shape: {}\n".format(AtA.shape)
+	
+	# Calculate eigenvalues and eigenfaces of AtA
+	eigenvalues, eigenfaces = np.linalg.eig(AtA)
+	
+	# Sort eigenvalues and eigenvectors (largest to smallest)
+	idx = eigenvalues.argsort()[::-1]   
+	eigenvalues = eigenvalues[idx]
+	eigenfaces = eigenfaces[:,idx]	
+
+	# Decide how many eigenfaces are enough to represent variance in our training set - at least 95 % variance
+	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
+
+	# Dominant eigenvectors
+	V = eigenfaces[:, 0 : k]
+	
+	# Calculate U (most important eigenvectors from AAt) by multiplying A and V (only most important eigenvectors)
+	U = np.matmul(A, V)
+
+	return U, m
+
+################################################################################
+# Extract and return features from each image in images (a.k.a. Projection)
+################################################################################
+def pca_extract_features(U, images, m):
+	U_T = np.transpose(U)
+	W_training = []
+	num_images = len(images)
+	images_unique = images - m
+	for i in range(num_images):
+		W_training.append(np.dot(U_T, images_unique[i]))
+	return np.array(W_training)
+
+################################################################################
+# Normalize data using mean and standard deviation
+################################################################################	
+def pca_normalize(data):
+	# Column-wise subtract the mean and divide by the std deviation
+	rows, columns = data.shape
+	for r in range(rows):
+		data[r] = (data[r] - (data[r]).mean(0)) / np.std(data[r])
+		
+	return data
+
+################################################################################
+# Main lda function
+################################################################################
+def lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z):	
+	# Step 1 - calculate separability between different classes (distance between means of different classes)
+	# Between-Class Matrix (Sb)
+	# Step 2 - calculate distance between means and the samples of each class
+	# Within-Class Matrix (Sw)
+	z = img_training.shape[1]
+	Sb, Sw = lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z)
+	
+	# Step 3 - Construct the lower dimensional space (Vk) that 
+	# Maximizes Between-Class Matrix and minimizes Within-Class Matrix
+	Swt = np.transpose(Sw)
+	print "\nWorking on np.dot for SwtSb...\n"
+	SwtSb = np.dot(Swt, Sb)
+	print "\nWorking on np.linalg.eigh...\n"
+	eigenvalues, eigenvectors = np.linalg.eigh(SwtSb)
+		
+	# Decide how many eigenvectors are enough to represent variance in our training set - at least 95 % variance
+	k = reduce_number_of_eigenvectors(eigenvalues, 0.95)
+	# Dominant eigenvectors
+	Vk = eigenvectors[:, 0 : k]
+	Vk = np.transpose(Vk)
+	
+	# Step 4 - Project our original data into lower-dimensional space
+	Vk_training = np.dot(Vk, np.transpose(img_training))
+	Vk_testing = np.dot(Vk, np.transpose(img_testing))
+	
+	return np.transpose(Vk_training), np.transpose(Vk_testing)
+
+################################################################################
+# Lda helper, computes Between-Class Matrix (Sb) and Within-Class Matrix (Sw)
+################################################################################
+def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z):
+	# Compute mean of each class
+	img_rows, img_columns = img_training.shape
+	m = np.zeros((num_of_people, img_columns))
+	classes_training = classes_training.astype(np.int)
+	for r in range(img_rows):
+		m[classes_training[r] - 1] = m[classes_training[r] - 1] + img_training[r]
+	for r in range(num_of_people):
+		m[r] = m[r] / num_of_faces_per_person
+	
+	# Compute total mean of all data
+	m_total = (img_training.mean(0))[0]
+	
+	# Calculate separability between different classes (distance between means of different classes)
+	# "Between-Class Matrix" (Sb)
+	Sb = np.zeros((z, z))
+	n = 8 # constant - number of training images per class
+	print "\nWorking on np.outer fro Sb...\n"
+	for r in range(num_of_people):
+		class_mean_minus_total = m[r] - m_total
+		outer_product = n * np.outer(class_mean_minus_total, class_mean_minus_total)
+		Sb = Sb + outer_product * float(5)
+	
+	# Calculate distance between means and the samples of each class
+	# "Within-Class Matrix" (Sw)	
+	Sw = np.zeros((z, z))
+	print "\nWorking on np.outer fro Sw...\n"
+	for r in range(num_of_people):
+		for img_r in range(img_rows): 
+			img_minus_class_mean = img_training[img_r] - m[classes_training[img_r] - 1]
+			outer_product = np.outer(img_minus_class_mean, img_minus_class_mean)
+			Sw = Sw + outer_product * float(5)
+			
+	return Sb, Sw
+
+################################################################################
+# Calculate minimum number of eigenvectors needed to capture min_variance
+################################################################################
+def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
+	eigenvalues_training_len = len(eigenvalues_training)
+	eigenvalues_training_sum = np.sum(eigenvalues_training)
+	for k in range(eigenvalues_training_len):
+		v = np.sum(eigenvalues_training[0:k]) / eigenvalues_training_sum
+		if v >= min_variance:
+			return k + 1 # Add one because k count starts at 0
 	
 def main():
 
@@ -210,6 +214,10 @@ def main():
 
 	img_height = 112
 	img_width = 92
+	if (len(sys.argv) > 1):
+		if ("-resize" in sys.argv):
+			img_height = 56
+			img_width = 46
 	num_of_pixels = img_height * img_width
 	num_of_people = 40
 	num_of_faces_per_person = 10
@@ -218,7 +226,7 @@ def main():
 	classes = np.zeros(num_of_faces) # all classes
 	
 	if (len(sys.argv) > 1):
-		if (sys.argv[1] == "-resize"):
+		if ("-resize" in sys.argv):
 			print "\nAll of the images will be resized form (112x92) to (56x46)...\n"
 	
 	# Iterate through facial images and separate them into training and testing matrixes (80 : 20 ratio) with each row being a flat version of image
@@ -228,7 +236,7 @@ def main():
 			# Read image
 			img = cv2.imread("data/s" + str(i) + "/" + str(j) + ".pgm", 0) * (1.0 / 255.0)
 			if (len(sys.argv) > 1):
-				if (sys.argv[1] != "-resize"):
+				if ("-resize" in sys.argv):
 					img = cv2.resize(img, (56, 46)) 
 			rows, columns = img.shape
 			# 2D image matrix to 1D row vector
@@ -294,12 +302,18 @@ def main():
 	
 	# Use different unique combinations of the 5 groups to perform training and testing - average accuracy
 	combinations = set(itertools.permutations([0, 1, 2, 3, 4]))
-	average_accuracy_pca_knn = 0
-	accuracies_pca_knn = np.zeros(120)
-	average_accuracy_lda_knn = 0
-	accuracies_lda_knn = np.zeros(120)
-	average_accuracy_pca_lda_knn = 0
-	accuracies_pca_lda_knn = np.zeros(120)
+	if (len(sys.argv) > 1):
+		if ("-pca" in sys.argv):
+			average_accuracy_pca_knn = 0
+			accuracies_pca_knn = np.zeros(120)
+	if (len(sys.argv) > 1):
+		if ("-lda" in sys.argv):
+			average_accuracy_lda_knn = 0
+			accuracies_lda_knn = np.zeros(120)
+	if (len(sys.argv) > 1):
+		if ("-pca+lda" in sys.argv):
+			average_accuracy_pca_lda_knn = 0
+			accuracies_pca_lda_knn = np.zeros(120)
 	counter = 0
 	for combo in combinations:
 		print "\n----------------------------------------------------------------------"
@@ -312,59 +326,112 @@ def main():
 		# Testing data
 		img_testing = np.array(image_groups[combo[4]], np.double)
 		classes_testing = np.array(image_classes_groups[combo[4]])
-		# Run PCA		
-		print "\nPCA + KNN...\n"
-		# Feature extraction using pca
-		W_training, W_testing = pca(img_training, img_testing)
-		# Face recognition using KNN
-		accuracies_pca_knn[counter]  = knn(W_training, classes_training, W_testing, classes_testing)
-		'''
-		# Test to compare accuracy to sklearn algorithm
-		knn = KNeighborsClassifier(n_neighbors = 1)
-		knn.fit(W_training, classes_training)
-		pred = knn.predict(W_testing)
-		rows_testing, cols_testing = W_testing.shape
-		total_correct = 0.0
-		total_incorrect = 0.0	
-		for r in range(rows_testing):
-			# Check if the classification is correct
-			if pred[r] == classes_testing[r]:
-				total_correct = total_correct + 1.0
-			else:
-				total_incorrect = total_incorrect + 1.0
-		accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
-		print "\nAccuracy (sklearn): {}%.\n".format(accuracy)
-		break
-		'''
-		
-		# Run LDA
-		#print "\nLDA + KNN...\n"
-		z = img_training.shape[0]
-		Vk_training, Vk_testing = lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z)
-		
-		
-		# Run PCA + LDA
-		#print "\nPCA + LDA + KNN...\n"
-		accuracies_lda_knn[counter]  = knn(Vk_training, classes_training, Vk_testing, classes_testing)
-		
-		break
-		
+
+		if (len(sys.argv) > 1):
+			if ("-pca" in sys.argv):		
+				# Run PCA		
+				print "\nPCA + KNN...\n"
+				# Feature extraction using pca
+				W_training, W_testing = pca(img_training, img_testing)
+				# Face recognition using KNN
+				accuracies_pca_knn[counter]  = knn_1(W_training, classes_training, W_testing, classes_testing)
+				'''
+				# Test to compare accuracy to sklearn algorithm
+				knn = KNeighborsClassifier(n_neighbors = 1)
+				knn.fit(W_training, classes_training)
+				pred = knn.predict(W_testing)
+				rows_testing, cols_testing = W_testing.shape
+				total_correct = 0.0
+				total_incorrect = 0.0	
+				for r in range(rows_testing):
+					# Check if the classification is correct
+					if pred[r] == classes_testing[r]:
+						total_correct = total_correct + 1.0
+					else:
+						total_incorrect = total_incorrect + 1.0
+				accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+				print "\nAccuracy (sklearn): {}%.\n".format(accuracy)
+				break
+				'''
+
+		if (len(sys.argv) > 1):
+			if ("-lda" in sys.argv):
+				# Run LDA
+				print "\nLDA + KNN...\n"
+				z = img_training.shape[1]
+				Vk_training, Vk_testing = lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z)
+				accuracies_lda_knn[counter]  = knn_1(Vk_training, classes_training, Vk_testing, classes_testing)		
+				'''
+				# Test to compare accuracy to sklearn algorithm
+				knn = KNeighborsClassifier(n_neighbors = 1)
+				knn.fit(Vk_training, classes_training)
+				pred = knn.predict(Vk_testing)
+				rows_testing, cols_testing = Vk_testing.shape
+				total_correct = 0.0
+				total_incorrect = 0.0	
+				for r in range(rows_testing):
+					# Check if the classification is correct
+					if pred[r] == classes_testing[r]:
+						total_correct = total_correct + 1.0
+					else:
+						total_incorrect = total_incorrect + 1.0
+				accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+				print "\nAccuracy (sklearn): {}%.\n".format(accuracy)
+				break
+				'''
+
+		if (len(sys.argv) > 1):
+			if ("-pca+lda" in sys.argv):
+				# Run PCA + LDA
+				print "\nPCA + LDA + KNN...\n"
+				# Feature extraction using pca
+				W_training, W_testing = pca(img_training, img_testing)
+				z = W_training.shape[1]
+				Vk_training, Vk_testing = lda(W_training, classes_training, W_testing, num_of_people, num_of_faces_per_person, z)
+				accuracies_pca_lda_knn[counter]  = knn_1(Vk_training, classes_training, Vk_testing, classes_testing)
+				'''
+				# Test to compare accuracy to sklearn algorithm
+				knn = KNeighborsClassifier(n_neighbors = 1)
+				knn.fit(Vk_training, classes_training)
+				pred = knn.predict(Vk_testing)
+				rows_testing, cols_testing = Vk_testing.shape
+				total_correct = 0.0
+				total_incorrect = 0.0	
+				for r in range(rows_testing):
+					# Check if the classification is correct
+					if pred[r] == classes_testing[r]:
+						total_correct = total_correct + 1.0
+					else:
+						total_incorrect = total_incorrect + 1.0
+				accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+				print "\nAccuracy (sklearn): {}%.\n".format(accuracy)
+				break
+				'''
+
 		counter = counter + 1
 		
 	#print "\nCombinations:\n"
 	#print combinations 
-	print "\nPCA + KNN accuracies:\n"
-	print accuracies_pca_knn
-	print "\nLDA + KNN accuracies:\n"
-	print accuracies_lda_knn
-	print "\nPCA + LDA + KNN accuracies:\n"
-	print accuracies_pca_lda_knn
-	average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
-	print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
-	average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
-	print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)
-	average_accuracy_pca_lda_knn = sum(accuracies_pca_lda_knn) / 120
-	print "\nAverage PCA + LDA + KNN accuracy: {}%.\n".format(average_accuracy_pca_lda_knn)
+	if (len(sys.argv) > 1):
+		if ("-pca" in sys.argv):
+			print "\nAll PCA + KNN accuracies:\n"
+			print accuracies_pca_knn
+			average_accuracy_pca_knn = sum(accuracies_pca_knn) / 120
+			print "\nAverage PCA + KNN accuracy: {}%.\n".format(average_accuracy_pca_knn)
+
+	if (len(sys.argv) > 1):
+		if ("-lda" in sys.argv):
+			print "\nAll LDA + KNN accuracies:\n"
+			print accuracies_lda_knn
+			average_accuracy_lda_knn = sum(accuracies_lda_knn) / 120
+			print "\nAverage LDA + KNN accuracy: {}%.\n".format(average_accuracy_lda_knn)	
+
+	if (len(sys.argv) > 1):
+		if ("-pca+lda" in sys.argv):
+			print "\nAll PCA + LDA + KNN accuracies:\n"
+			print accuracies_pca_lda_knn
+			average_accuracy_pca_lda_knn = sum(accuracies_pca_lda_knn) / 120
+			print "\nAverage PCA + LDA + KNN accuracy: {}%.\n".format(average_accuracy_pca_lda_knn)
 	
 if __name__ == "__main__":
 	main()

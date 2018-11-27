@@ -1,8 +1,8 @@
-Support vector machines for face recognition
+KNN (k = 1) for face recognition
 
 Overview:
 
-Face recognition is implemented using KNN (1KNN in this case) with PCA and LDA techniques for dimensionality reduction. Design is validated via five-fold cross validation and average accuracy is reported for each implementation. 
+Face recognition is implemented using k-nearest neighbors algorithm with pca, lda, and pca+lda preprocessing. Design is validated via five-fold cross validation and average accuracy is reported for each implementation. This code can also be run on images with reduced size.
 
 Dataset:
 
@@ -10,82 +10,122 @@ The Database of Faces is used to perform all of the training and testing in this
 
 Prerequisites:
 
--	python 2.7
--	cv2
--	numpy
--	cvxopt
--	math
--	random
--	itertools
+    python 2.7
+    sys
+	cv2
+    numpy
+    math
+    random
+    itertools
 
 Running:
 
-python knn_pca_main.py
+PCA + KNN: python knn_main.py -pca
+PCA + KNN (resized images): python knn_main.py -pca -resize
+LDA + KNN: python knn_main.py -lda
+PCA + LDA + KNN: python knn_main.py -pca+lda
 
-or
-
-python knn_lda_main.py
-
-
-___________________________________________________________________
 Function blocks:
 
----	main()
--	Reads in images
--	Breaks images into 5 image groups for five-fold cross validation
--	Iterates through unique combinations of 5 image groups and calls linear and polynomial svm() to train on and test on these unique combinations
--	Reports average accuracies for linear and polynomial implementations
+--- main()
 
----	svm(num_of_people, img_training, classes_training, img_testing, classes_testing, polynomial_flag = False, polynomial_degree = 2.0)
--	Calls training() and testing() function blocks
--	Returns accuracy
+    Reads in images
+    Breaks images into 5 image groups for five-fold cross validation
+    Iterates through unique combinations of 5 image groups and calls (pca + knn), (lda + knn), or (pca + lda + knn) to train on and test on these unique combinations based on the input
+    Reports average accuracies for (pca + knn), (lda + knn), or (pca + lda + knn) implementations
 
----	training(img_training, classes_training, num_of_people, polynomial_flag = False, polynomial_degree = 2.0)
--	Calculates a model (w and b) for every class using quadratic programming solver
--	Returns a list of w’s and b’s each corresponding to one of the classes (40 people)
+--- knn_1(W_training, classes_training, W_testing, classes_testing)
 
----	testing(img_testing, classes_testing, num_of_people, w, b)
--	Tests each test images against every class (40 people) and reports on total of correctly and incorrectly classified images
--	Returns accuracy
+    Computes k-nearest neighbor (k = 1) classifications for testing data
+    Returns accuracy
+
+--- distance(list1, list2)
+
+    Calculate distance between values of two lists of the same size
+    Returns distance between two lists
+
+--- pca(img_training, img_testing)
+
+    Main pca function
+	Calls pca_analysis, pca_extract_features, and pca_normalize
+    Returns training and testing dataset in reduced dimension
+
+--- pca_analysis(T)
+
+    Calculate U (most important eigenvectors from AAt) by multiplying A and V (only most important eigenvectors)
+    Returns U and average image from training dataset
+
+--- pca_extract_features(U, images, m)
+
+    Extracts and return features from each image in images (a.k.a. Projection)
+
+--- pca_normalize(data)
+
+    Normalizes data using mean and standard deviation
+
+--- lda(img_training, classes_training, img_testing, num_of_people, num_of_faces_per_person, z)
+
+    Main lda function
+	Calls lda_sb_and_sw to compute Between-Class Matrix (Sb) and Within-Class Matrix (Sw)
+	Constructs the lower dimensional space (Vk) that maximizes Between-Class Matrix and minimizes Within-Class Matrix
+	Projects original data into lower-dimensional space
+    Returns training and testing dataset in reduced dimension
+
+--- lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_per_person, z)
+
+    Calculates separability between different classes (distance between means of different classes) - Between-Class Matrix (Sb)
+	Calculates distance between means and the samples of each class - Within-Class Matrix (Sw)
+    Returns Sb and Sw
+
+--- reduce_number_of_eigenvectors(eigenvalues_training, min_variance)
+
+    Calculates and returns minimum number of eigenvectors needed to capture min_variance (k)
 
 Results:
 
-Average linear accuracy: 84.6515625%
+Average PCA + KNN accuracy: 95.51 %
 
-Average quadratic (degree = 2) accuracy: 95.125%
+Average PCA + KNN accuracy (resized):  95.12 %
 
-Group combinations:
-[(0, 3, 2, 4, 1), (2, 0, 3, 4, 1), (1, 3, 2, 4, 0), (1, 2, 0, 3, 4), (0, 3, 4, 2, 1), (2, 4, 1, 3, 0), (3, 4, 0, 2, 1), (0, 4, 3, 1, 2), (0, 1, 4, 3, 2), (1, 3, 4, 2, 0), (4, 2, 1, 3, 0), (2, 1, 3, 4, 0), (1, 4, 0, 2, 3), (0, 3, 2, 1, 4), (2, 0, 1, 3, 4), (0, 2, 3, 1, 4), (4, 0, 1, 3, 2), (2, 1, 0, 3, 4), (3, 1, 2, 4, 0), (3, 2, 0, 4, 1), (2, 3, 4, 0, 1), (4, 2, 0, 3, 1), (2, 4, 1, 0, 3), (2, 1, 4, 0, 3), (3, 0, 2, 4, 1), (2, 1, 0, 4, 3), (0, 2, 3, 4, 1), (4, 3, 1, 0, 2), (0, 2, 4, 3, 1), (0, 4, 2, 1, 3), (1, 0, 3, 2, 4), (1, 2, 4, 0, 3), (1, 3, 4, 0, 2), (3, 0, 1, 4, 2), (4, 1, 2, 3, 0), (4, 1, 2, 0, 3), (2, 4, 3, 1, 0), (2, 0, 4, 1, 3), (1, 4, 3, 0, 2), (2, 3, 1, 4, 0), (0, 1, 2, 3, 4), (0, 2, 1, 4, 3), (2, 3, 0, 1, 4), (4, 3, 1, 2, 0), (4, 1, 3, 0, 2), (0, 4, 1, 3, 2), (0, 2, 1, 3, 4), (0, 3, 1, 4, 2), (3, 0, 4, 2, 1), (1, 4, 2, 0, 3), (3, 1, 0, 2, 4), (1, 0, 2, 4, 3), (3, 4, 0, 1, 2), (4, 0, 3, 2, 1), (1, 4, 3, 2, 0), (0, 1, 4, 2, 3), (3, 0, 2, 1, 4), (0, 4, 2, 3, 1), (0, 2, 4, 1, 3), (2, 4, 3, 0, 1), (1, 3, 2, 0, 4), (3, 2, 0, 1, 4), (4, 1, 0, 3, 2), (2, 0, 4, 3, 1), (3, 1, 4, 2, 0), (1, 0, 3, 4, 2), (2, 0, 3, 1, 4), (0, 1, 3, 4, 2), (3, 1, 0, 4, 2), (2, 1, 4, 3, 0), (3, 2, 1, 4, 0), (0, 3, 1, 2, 4), (2, 1, 3, 0, 4), (1, 2, 3, 0, 4), (0, 1, 2, 4, 3), (1, 0, 4, 3, 2), (4, 0, 3, 1, 2), (3, 4, 2, 1, 0), (4, 3, 0, 1, 2), (4, 2, 3, 1, 0), (2, 4, 0, 1, 3), (4, 3, 2, 1, 0), (1, 2, 0, 4, 3), (1, 0, 4, 2, 3), (1, 4, 0, 3, 2), (4, 2, 3, 0, 1), (0, 4, 1, 2, 3), (1, 0, 2, 3, 4), (4, 3, 2, 0, 1), (4, 2, 1, 0, 3), (3, 0, 4, 1, 2), (3, 1, 4, 0, 2), (2, 0, 1, 4, 3), (3, 2, 4, 1, 0), (2, 3, 4, 1, 0), (4, 3, 0, 2, 1), (0, 1, 3, 2, 4), (1, 2, 4, 3, 0), (2, 3, 1, 0, 4), (4, 2, 0, 1, 3), (4, 0, 2, 3, 1), (0, 3, 4, 1, 2), (1, 3, 0, 2, 4), (4, 1, 0, 2, 3), (2, 4, 0, 3, 1), (3, 4, 1, 0, 2), (3, 4, 1, 2, 0), (1, 4, 2, 3, 0), (3, 4, 2, 0, 1), (4, 0, 1, 2, 3), (3, 0, 1, 2, 4), (4, 1, 3, 2, 0), (0, 4, 3, 2, 1), (3, 2, 1, 0, 4), (1, 2, 3, 4, 0), (3, 2, 4, 0, 1), (1, 3, 0, 4, 2), (4, 0, 2, 1, 3), (3, 1, 2, 0, 4), (2, 3, 0, 4, 1)]
+Average LDA + KNN accuracy: 97.5 %
 
-All linear accuracies (1 per group combination):
-[85.      83.53125 82.875   81.78125 85.      84.375   88.1875  85.21875
- 85.21875 82.875   85.9375  84.375   80.875   84.8125  83.78125 84.8125
- 85.21875 83.78125 86.375   88.1875  83.53125 85.78125 84.6875  84.6875
- 88.1875  84.6875  85.      85.21875 85.      85.09375 81.78125 80.875
- 82.      85.90625 85.9375  85.71875 84.375   84.6875  82.      84.375
- 84.8125  85.09375 83.78125 85.9375  85.21875 85.21875 84.8125  85.21875
- 88.1875  80.875   85.875   80.875   85.90625 85.78125 82.875   85.09375
- 85.875   85.      85.09375 83.53125 81.78125 85.875   85.21875 83.53125
- 86.375   82.      83.78125 85.21875 85.90625 84.375   86.375   84.8125
- 83.78125 81.78125 85.09375 82.      85.21875 86.375   85.21875 85.9375
- 84.6875  85.9375  80.875   80.875   82.      85.78125 85.09375 81.78125
- 85.78125 85.71875 85.90625 85.90625 84.6875  86.375   84.375   85.78125
- 84.8125  82.875   83.78125 85.71875 85.78125 85.21875 81.78125 85.71875
- 83.53125 85.90625 86.375   82.875   88.1875  85.71875 85.875   85.9375
- 85.      85.875   82.875   88.1875  82.      85.71875 85.875   83.53125]
+Average PCA + LDA + KNN accuracy: 94.33 %
 
-All quadratic accuracies (1 per group combination):
-[95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125
- 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125 95.125]
- 
- ___________________________________________________________________
+All PCA + KNN accuracy: [ 92.5   92.5   93.75  96.25  92.5   93.75  92.5   97.5   97.5   93.75
+  93.75  93.75  97.5   96.25  96.25  96.25  97.5   96.25  93.75  92.5   92.5
+  92.5   97.5   97.5   92.5   97.5   92.5   97.5   92.5   97.5   96.25
+  97.5   97.5   97.5   93.75  97.5   93.75  97.5   97.5   93.75  96.25
+  97.5   96.25  93.75  97.5   97.5   96.25  97.5   92.5   97.5   96.25
+  97.5   97.5   92.5   93.75  97.5   96.25  92.5   97.5   92.5   96.25
+  96.25  97.5   92.5   93.75  97.5   96.25  97.5   97.5   93.75  93.75
+  96.25  96.25  96.25  97.5   97.5   97.5   93.75  97.5   93.75  97.5
+  93.75  97.5   97.5   97.5   92.5   97.5   96.25  92.5   97.5   97.5   97.5
+  97.5   93.75  93.75  92.5   96.25  93.75  96.25  97.5   92.5   97.5
+  96.25  97.5   92.5   97.5   93.75  93.75  92.5   97.5   96.25  93.75
+  92.5   96.25  93.75  92.5   97.5   97.5   97.5   92.5 ]
+
+All PCA + KNN (resized) accuracy: [ 93.75  93.75  97.5   95.    93.75  96.25  93.75  95.    95.    97.5
+  96.25  96.25  95.    95.    95.    95.    96.25  95.    96.25  93.75
+  93.75  93.75  95.    95.    93.75  95.    93.75  95.    93.75  95.    95.
+  95.    95.    96.25  96.25  95.    96.25  95.    95.    96.25  95.    95.
+  95.    96.25  95.    95.    95.    95.    93.75  95.    95.    95.    96.25
+  93.75  95.    95.    95.    93.75  95.    93.75  95.    95.    96.25
+  93.75  96.25  95.    95.    95.    96.25  96.25  96.25  95.    95.    95.
+  95.    95.    96.25  96.25  95.    96.25  95.    96.25  95.    95.    93.75
+  93.75  95.    95.    93.75  95.    96.25  96.25  95.    96.25  96.25
+  93.75  95.    97.5   95.    95.    93.75  95.    95.    95.    93.75  95.
+  96.25  97.5   93.75  95.    95.    96.25  93.75  95.    97.5   93.75  95.
+  95.    95.    93.75]
+
+All PCA + LDA + KNN accuracy: [ 91.25  91.25  91.25  98.75  90.    91.25  91.25  92.5   93.75  92.5   92.5
+  92.5   97.5   98.75  98.75  97.5   93.75  98.75  92.5   91.25  90.    90.
+  98.75  97.5   91.25  96.25  91.25  93.75  90.    96.25  98.75  97.5
+  93.75  93.75  92.5   97.5   92.5   98.75  93.75  92.5   97.5   96.25
+  98.75  92.5   93.75  92.5   97.5   92.5   91.25  97.5   97.5   98.75
+  93.75  90.    91.25  96.25  98.75  91.25  97.5   90.    98.75  97.5
+  93.75  90.    92.5   92.5   98.75  93.75  93.75  91.25  92.5   97.5
+  98.75  98.75  97.5   93.75  93.75  92.5   93.75  92.5   96.25  92.5   97.5
+  98.75  93.75  91.25  96.25  98.75  90.    96.25  93.75  93.75  97.5   92.5
+  92.5   91.25  98.75  91.25  98.75  95.    90.    93.75  98.75  96.25  90.
+  93.75  92.5   91.25  91.25  95.    97.5   92.5   91.25  98.75  91.25
+  91.25  92.5   96.25  97.5   90.  ]
