@@ -136,12 +136,14 @@ def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_pe
 	# Calculate separability between different classes (distance between means of different classes)
 	# "Between-Class Matrix (Sb)
 	Sb = np.zeros((z, z))
+	n = 8
 	for r in range(num_of_people):
 		class_mean_minus_total = m[r] - m_total
 		class_mean_minus_total_T = np.transpose(class_mean_minus_total)
-		print class_mean_minus_total.shape
-		outer_product = np.outer(class_mean_minus_total, class_mean_minus_total_T)
-		Sb = Sb + dot_product * float(5)
+		print class_mean_minus_total
+		print class_mean_minus_total_T
+		outer_product = n * np.outer(class_mean_minus_total, class_mean_minus_total)
+		Sb = Sb + outer_product * float(5)
 	
 	# Calculate distance between means and the samples of each class
 	# "Within-Class Matrix (Sw)	
@@ -151,7 +153,7 @@ def lda_sb_and_sw(img_training, classes_training, num_of_people, num_of_faces_pe
 		for img_r in range(img_rows): 
 			img_minus_class_mean = img_training[img_r] - mean
 			outer_product = np.outer(img_minus_class_mean, np.transpose(img_minus_class_mean))
-			Sw = Sw + dot_product * float(5)
+			Sw = Sw + outer_product * float(5)
 			
 	return Sb, Sw
 	
@@ -216,8 +218,9 @@ def main():
 	classes = np.zeros(num_of_faces) # all classes
 	
 	if (len(sys.argv) > 1):
-		if (sys.argv[1] != "-resize"):
+		if (sys.argv[1] == "-resize"):
 			print "\nAll of the images will be resized form (112x92) to (56x46)...\n"
+	
 	# Iterate through facial images and separate them into training and testing matrixes (80 : 20 ratio) with each row being a flat version of image
 	counter = 0
 	for i in range(1, num_of_people + 1, 1):
