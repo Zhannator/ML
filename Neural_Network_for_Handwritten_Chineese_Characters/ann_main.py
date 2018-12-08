@@ -236,13 +236,11 @@ def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 		if v >= min_variance:
 			return k + 1 # Add one because k count starts at 0
 
-def sigmoid(data):
-	output = 1 / (1 + np.exp(-data))
-	
-	return output
-
-def scale_error(error):
-	output = error * (1 - error)
+def sigmoid(data, derivative = False):
+	if derivative == True:
+		output = data * (1 - data)
+	else:
+		output = 1 / (1 + np.exp(-data))
 	
 	return output
 	
@@ -292,13 +290,13 @@ def main():
 		# Output layer error
 		layer_2_error = classes_training - layer_2
 		# Scale output layer error based on confidence
-		layer_2_error_scaled = layer_2_error * scale_error(layer_2)
+		layer_2_error_scaled = layer_2_error * sigmoid(layer_2, True)
 		print layer_2_error_scaled.shape
 		
 		# Hidden layer error
 		layer_1_error = layer_2_error_scaled.dot(weights_1_2.T)
 		# Scale hidden layer error based on confidence
-		layer_1_error_scaled = layer_1_error * scale_error(layer_1)
+		layer_1_error_scaled = layer_1_error * sigmoid(layer_1, True)
 
 		# Correct weights based on scaled errors
 		weights_0_1 = weights_0_1 + layer_0.T.dot(layer_1_error_scaled)
