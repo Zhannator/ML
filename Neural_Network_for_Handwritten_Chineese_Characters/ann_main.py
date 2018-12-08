@@ -235,7 +235,17 @@ def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 		v = np.sum(eigenvalues_training[0:k]) / eigenvalues_training_sum
 		if v >= min_variance:
 			return k + 1 # Add one because k count starts at 0
-			
+
+def sigmoid(data):
+	output = 1 / (1 + np.exp(-data))
+	
+	return output
+
+def scale_error(error):
+	output = error * (1 - error)
+	
+	return output
+	
 def main():	
 	# Constants
 	num_of_classes = 62
@@ -266,6 +276,36 @@ def main():
 			print img_testing.shape
 	
 	#ANN
+	ann_transmissions = 1
+	rows, columns = img_training.shape
+	np.random.seed(1)
+	# Weights connecting layer 0 and 1
+	weights_0_1 = 2 * np.random.random((columns, rows)) - 1
+	# Weights connecting layer 1 and 2
+	weights_1_2 = 2 * np.random.random((rows, 1)) - 1
+	# Run ann with backpropagation (ann_transmissions) times
+	for i in range(ann_transmissions):
+		layer_0 = img_training # Input layer
+		layer_1 = sigmoid(np.dot(layer_0, weights_0_1)) # Hidden layer
+		layer_2 = sigmoid(np.dot(layer_1, weights_1_2)) # Output layer
+
+		# Output layer error
+		layer_2_error = classes_training - layer_2
+		# Scale output layer error based on confidence
+		layer_2_error_scaled = layer_2_error * scale_error(layer_2)
+		print layer_2_error_scaled.shape
+		
+		# Hidden layer error
+		layer_1_error = layer_2_error_scaled.dot(weights_1_2.T)
+		# Scale hidden layer error based on confidence
+		layer_1_error_scaled = layer_1_error * scale_error(layer_1)
+
+		# Correct weights based on scaled errors
+		weights_0_1 = weights_0_1 + layer_0.T.dot(layer_1_error_scaled)
+		weights_1_2 = weights_1_2 + layer_1.T.dot(layer_2_error_scaled)
+	
+	print layer_2
+	print "\nError: {}\n".format(np.mean(np.abs(layer_2_error)))
 	
 	# Result of ANN is a matrix of 1*62
 	
