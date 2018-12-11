@@ -6,17 +6,8 @@ import math
 import random
 import itertools
 
-def activation_function():
-	print "TODO"
-
-def ann():
-	print #TODO
-	
-	# Input layer (images)
-	
-	# Hidden layer (100 neurons)
-	
-	# Output layer (62 neurons)
+# ANN transmissions decide how many times ANN is going to do backpropagation to improve training
+ann_transmissions = 100
 
 def read_data():
 	img_height = 900
@@ -35,8 +26,8 @@ def read_data():
 	num_of_training_images = num_of_classes * num_of_training_images_per_class # 90 % testing images
 	images_training = np.zeros((num_of_training_images, num_of_pixels)) # each img as row vector
 	images_testing = np.zeros((num_of_testing_images, num_of_pixels)) # each img as row vector
-	classes_training = np.zeros(num_of_training_images) # classes
-	classes_testing = np.zeros(num_of_testing_images) # classes
+	classes_training = np.zeros((num_of_training_images, 1)) # classes
+	classes_testing = np.zeros((num_of_testing_images, 1)) # classes
 
 	if (len(sys.argv) > 1):
 		if ("-resize" in sys.argv):
@@ -59,7 +50,7 @@ def read_data():
 					img = cv2.resize(img, (img_height, img_width)) 
 			# 2D image matrix to 1D row vector
 			images_training[counter_training] = (np.array(img)).flatten()
-			classes_training[counter_training] = i
+			classes_training[counter_training][0] = i
 			counter_training = counter_training + 1
 		# Testing images
 		for j in range(num_of_training_images_per_class, rand_indexes_len, 1):
@@ -71,7 +62,7 @@ def read_data():
 					img = cv2.resize(img, (img_height, img_width)) 
 			# 2D image matrix to 1D row vector
 			images_testing[counter_testing] = (np.array(img)).flatten()
-			classes_testing[counter_testing] = i
+			classes_testing[counter_testing][0] = i
 			counter_testing = counter_testing + 1
 	# Convert images to type double
 	images_training = images_training.astype(np.double)
@@ -170,9 +161,9 @@ def lda(img_training, classes_training, img_testing, num_of_classes, num_of_imag
 	# Step 3 - Construct the lower dimensional space (Vk) that 
 	# Maximizes Between-Class Matrix and minimizes Within-Class Matrix
 	Swt = np.transpose(Sw)
-	print "\nWorking on np.dot for SwtSb...\n"
+	print "\n...working on np.dot for SwtSb...\n"
 	SwtSb = np.dot(Swt, Sb)
-	print "\nWorking on np.linalg.eigh...\n"
+	print "\n...working on np.linalg.eigh...\n"
 	eigenvalues, eigenvectors = np.linalg.eigh(SwtSb)
 		
 	# Decide how many eigenvectors are enough to represent variance in our training set - at least 95 % variance
@@ -196,7 +187,7 @@ def lda_sb_and_sw(img_training, classes_training, num_of_classes, num_of_images_
 	m = np.zeros((num_of_classes, img_columns))
 	classes_training = classes_training.astype(np.int)
 	for r in range(img_rows):
-		m[classes_training[r] - 1] = m[classes_training[r] - 1] + img_training[r]
+		m[classes_training[r][0] - 1] = m[classes_training[r][0] - 1] + img_training[r]
 	for r in range(num_of_classes):
 		m[r] = m[r] / num_of_images_per_class
 	
@@ -207,7 +198,7 @@ def lda_sb_and_sw(img_training, classes_training, num_of_classes, num_of_images_
 	# "Between-Class Matrix" (Sb)
 	Sb = np.zeros((z, z))
 	n = 8 # constant - number of training images per class
-	print "\nWorking on np.outer fro Sb...\n"
+	print "\n...working on np.outer fro Sb...\n"
 	for r in range(num_of_classes):
 		class_mean_minus_total = m[r] - m_total
 		outer_product = n * np.outer(class_mean_minus_total, class_mean_minus_total)
@@ -216,10 +207,10 @@ def lda_sb_and_sw(img_training, classes_training, num_of_classes, num_of_images_
 	# Calculate distance between means and the samples of each class
 	# "Within-Class Matrix" (Sw)	
 	Sw = np.zeros((z, z))
-	print "\nWorking on np.outer fro Sw...\n"
+	print "\n...working on np.outer fro Sw...\n"
 	for r in range(num_of_classes):
 		for img_r in range(img_rows): 
-			img_minus_class_mean = img_training[img_r] - m[classes_training[img_r] - 1]
+			img_minus_class_mean = img_training[img_r] - m[classes_training[img_r][0] - 1]
 			outer_product = np.outer(img_minus_class_mean, img_minus_class_mean)
 			Sw = Sw + outer_product * float(5)
 			
@@ -238,11 +229,74 @@ def reduce_number_of_eigenvectors(eigenvalues_training, min_variance):
 
 def sigmoid(data, derivative = False):
 	if derivative == True:
-		output = data * (1 - data)
+		output = np.multiply(data, (1 - data))
 	else:
 		output = 1 / (1 + np.exp(-data))
 	
 	return output
+
+def ann_f(imgages, weights_0_1, weights_1_2):
+	# Bias
+	b = 1
+	# Forward ann
+	layer_0 = imgages # Input layer
+	layer_1 = sigmoid(np.dot(layer_0, weights_0_1) + b) # Hidden layer
+	layer_2 = sigmoid(np.dot(layer_1, weights_1_2) + b) # Output layer
+	
+	return layer_0, layer_1, layer_2
+	
+def ann_b(classes, layer_0, layer_1, layer_2, weights_0_1, weights_1_2):
+	# Backpropagation
+	# Output error
+	#print "\nclasses: {}\n".format(classes.shape)
+	layer_2_error = output_error(classes, layer_2)
+	
+	#print "\nlayer_2_error: {}\n".format(layer_2_error.shape) 
+	# Scale output layer error based on confidence
+	layer_2_derivative = sigmoid(layer_2, True)
+	#print "\nlayer_2_derivative: {}\n".format(layer_2_derivative.shape) 
+	layer_2_error_scaled = np.multiply(layer_2_error, layer_2_derivative)
+	#print "\nlayer_2_error_scaled: {}\n".format(layer_2_error_scaled.shape)
+	# Hidden layer error		
+	layer_1_error = np.dot(layer_2_error_scaled, np.transpose(weights_1_2))
+	# Scale hidden layer error based on confidence
+	layer_1_derivative = sigmoid(layer_1, True)
+	#print "\nlayer_1_derivative: {}\n".format(layer_1_derivative.shape) 
+	layer_1_error_scaled = np.multiply(layer_1_error, layer_1_derivative)
+
+	# Correct weights based on scaled errors
+	weights_0_1 = weights_0_1 + np.dot(np.transpose(layer_0), layer_1_error_scaled)
+	weights_1_2 = weights_1_2 + np.dot(np.transpose(layer_1), layer_2_error_scaled)
+	
+	return weights_0_1, weights_1_2
+	
+def output_error(expected_classes, actual_classes):
+	error = expected_classes - actual_classes
+	
+	error_mean = np.mean(np.abs(error))
+	print "\nMean Output Error: {}\n".format(error_mean)
+	
+	return error
+	
+def ann_test(expected_classes, actual_classes):
+	list_classes = range(1, 63, 1)
+	total_correct = 0.0
+	total_incorrect = 0.0
+	ann_distances = np.zeros((len(expected_classes), 62))
+	for i in range(len(expected_classes)):
+		confidence = 1 - math.pow(actual_classes[i]*62 - list_classes, 2)
+		ann_distances[i] = confidence
+		classification = list_classes[np.argmax(confidence)]
+		if classification == expected_classes[i]:
+			total_correct = total_correct + 1.0
+		else:
+			total_incorrect = total_incorrect + 1.0
+	
+	print "\nTotal correct classifications: {}.\n".format(total_correct)
+	print "\nTotal incorrect classifications: {}.\n".format(total_incorrect)
+	accuracy = ((total_correct / (total_correct + total_incorrect)) * 100) # Accuracy
+	print "\nAccuracy: {}%.\n".format(accuracy)
+	return accuracy, ann_confidenced
 	
 def main():	
 	# Constants
@@ -253,7 +307,9 @@ def main():
 	print "\nCreate Training and testing data..."
 	img_training, classes_training, img_testing, classes_testing = read_data()
 	print "\nimg_training shape: {}\n".format(img_training.shape)
+	print "\nclasses_training shape: {}\n".format(classes_training.shape)
 	print "\nimg_testing shape: {}\n".format(img_testing.shape)
+	print "\nclasses_testing shape: {}\n".format(classes_testing.shape)
 	
 	# PCA
 	if (len(sys.argv) > 1):
@@ -261,8 +317,6 @@ def main():
 			print "\nUsing PCA...\n"
 			# Feature extraction using pca
 			img_training, img_testing = pca(img_training, img_testing)
-			print img_training.shape
-			print img_testing.shape
 	
 	# LDA
 	if (len(sys.argv) > 1):
@@ -270,11 +324,9 @@ def main():
 			print "\nUsing LDA...\n"
 			z = img_training.shape[1]
 			img_training, img_testing = lda(img_training, classes_training, img_testing, num_of_classes, num_of_images_per_class, z)
-			print img_training.shape
-			print img_testing.shape
 	
-	#ANN
-	ann_transmissions = 1
+	# ANN Training
+	print "\nStarting neural network training...\n"
 	rows, columns = img_training.shape
 	np.random.seed(1)
 	# Weights connecting layer 0 and 1
@@ -283,29 +335,21 @@ def main():
 	weights_1_2 = 2 * np.random.random((rows, 1)) - 1
 	# Run ann with backpropagation (ann_transmissions) times
 	for i in range(ann_transmissions):
-		layer_0 = img_training # Input layer
-		layer_1 = sigmoid(np.dot(layer_0, weights_0_1)) # Hidden layer
-		layer_2 = sigmoid(np.dot(layer_1, weights_1_2)) # Output layer
-
-		# Output layer error
-		layer_2_error = classes_training - layer_2
-		# Scale output layer error based on confidence
-		layer_2_error_scaled = layer_2_error * sigmoid(layer_2, True)
-		print layer_2_error_scaled.shape
-		
-		# Hidden layer error
-		layer_1_error = layer_2_error_scaled.dot(weights_1_2.T)
-		# Scale hidden layer error based on confidence
-		layer_1_error_scaled = layer_1_error * sigmoid(layer_1, True)
-
-		# Correct weights based on scaled errors
-		weights_0_1 = weights_0_1 + layer_0.T.dot(layer_1_error_scaled)
-		weights_1_2 = weights_1_2 + layer_1.T.dot(layer_2_error_scaled)
+		layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
+		weights_0_1, weights_1_2 = ann_b(classes_training, layer_0, layer_1, layer_2, weights_0_1, weights_1_2)
 	
-	print layer_2
-	print "\nError: {}\n".format(np.mean(np.abs(layer_2_error)))
-	
+	#ANN Testing
+	print "\nStarting neural network testing...\n"
+	layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
+	print layer_2[0:20][0]
 	# Result of ANN is a matrix of 1*62
+	# Each dimension represents confidence of a character
+	accuracy, ann_confidenced = ann_test(classes_testing, layer_2)
+	print "\nOverall accuracy: {}\n".format(accuracy)
+	
+	f = open('output.txt','w')
+	f.write(str(ann_confidenced))
+	f.close()
 	
 if __name__ == "__main__":
 	main()
