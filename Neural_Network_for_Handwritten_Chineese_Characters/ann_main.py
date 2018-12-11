@@ -8,7 +8,7 @@ import itertools
 from progressbar import ProgressBar
 
 # ANN transmissions decide how many times ANN is going to do backpropagation to improve training
-ann_transmissions = 1000
+ann_transmissions = 10000
 
 def read_data():
 	img_height = 900
@@ -336,6 +336,7 @@ def main():
 	# Weights connecting layer 1 and 2
 	weights_1_2 = 2 * np.random.random((rows, 1)) - 1
 	# Run ann with backpropagation (ann_transmissions) times
+	pbar = ProgressBar()
 	for i in pbar(range(ann_transmissions)):
 		layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
 		weights_0_1, weights_1_2 = ann_b(classes_training, layer_0, layer_1, layer_2, weights_0_1, weights_1_2)
@@ -343,7 +344,7 @@ def main():
 	#ANN Testing
 	print "\nStarting neural network testing...\n"
 	layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
-	print layer_2
+	#print layer_2
 	# Result of ANN is a matrix of 1*62
 	# Each dimension represents confidence of a character
 	accuracy, ann_confidenced = ann_test(classes_testing, layer_2)
