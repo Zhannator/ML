@@ -5,9 +5,10 @@ import numpy as np
 import math
 import random
 import itertools
+from progressbar import ProgressBar
 
 # ANN transmissions decide how many times ANN is going to do backpropagation to improve training
-ann_transmissions = 100
+ann_transmissions = 1000
 
 def read_data():
 	img_height = 900
@@ -273,8 +274,8 @@ def ann_b(classes, layer_0, layer_1, layer_2, weights_0_1, weights_1_2):
 def output_error(expected_classes, actual_classes):
 	error = expected_classes - actual_classes
 	
-	error_mean = np.mean(np.abs(error))
-	print "\nMean Output Error: {}\n".format(error_mean)
+	#error_mean = np.mean(np.abs(error))
+	#print "\nMean Output Error: {}\n".format(error_mean)
 	
 	return error
 	
@@ -282,12 +283,13 @@ def ann_test(expected_classes, actual_classes):
 	list_classes = range(1, 63, 1)
 	total_correct = 0.0
 	total_incorrect = 0.0
-	ann_distances = np.zeros((len(expected_classes), 62))
+	ann_confidenced = np.zeros((len(expected_classes), 62))
 	for i in range(len(expected_classes)):
-		confidence = 1 - math.pow(actual_classes[i]*62 - list_classes, 2)
-		ann_distances[i] = confidence
-		classification = list_classes[np.argmax(confidence)]
-		if classification == expected_classes[i]:
+		ann_confidenced[i] = - np.abs(actual_classes[i][0] - list_classes)
+		ann_confidenced[i] = ann_confidenced[i] - ann_confidenced[i].min() # Get rid of negative values
+		ann_confidenced[i] = (ann_confidenced[i] * (1.0/ann_confidenced[i].max()) * 1.0) # distribute values between 0 and 1
+		classification = list_classes[np.argmax(ann_confidenced[i])]
+		if classification == expected_classes[i][0]:
 			total_correct = total_correct + 1.0
 		else:
 			total_incorrect = total_incorrect + 1.0
@@ -334,19 +336,19 @@ def main():
 	# Weights connecting layer 1 and 2
 	weights_1_2 = 2 * np.random.random((rows, 1)) - 1
 	# Run ann with backpropagation (ann_transmissions) times
-	for i in range(ann_transmissions):
+	for i in pbar(range(ann_transmissions)):
 		layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
 		weights_0_1, weights_1_2 = ann_b(classes_training, layer_0, layer_1, layer_2, weights_0_1, weights_1_2)
 	
 	#ANN Testing
 	print "\nStarting neural network testing...\n"
 	layer_0, layer_1, layer_2 = ann_f(img_training, weights_0_1, weights_1_2)
-	print layer_2[0:20][0]
+	print layer_2
 	# Result of ANN is a matrix of 1*62
 	# Each dimension represents confidence of a character
 	accuracy, ann_confidenced = ann_test(classes_testing, layer_2)
 	print "\nOverall accuracy: {}\n".format(accuracy)
-	
+	# Write output to a file
 	f = open('output.txt','w')
 	f.write(str(ann_confidenced))
 	f.close()
